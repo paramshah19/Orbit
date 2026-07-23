@@ -1,0 +1,569 @@
+/* ============================================================
+   Orbit — panel styles
+   Design notes: soft radii, one bordered container per region,
+   ghost buttons, generous spacing. Selectors that style <button>
+   must out-specify Obsidian's own `.theme-light button` rules
+   (0-1-1) or everything renders as a default outlined box.
+   ============================================================ */
+
+.orbit-root {
+  --orbit-radius: 12px;
+  --orbit-radius-sm: 8px;
+  --orbit-gap: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+}
+
+/* ---------- Brand bar ---------- */
+
+.orbit-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 2px 12px;
+}
+
+.orbit-brand-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.orbit-mark {
+  flex: 0 0 auto;
+  color: var(--interactive-accent);
+  display: block;
+}
+
+.orbit-wordmark {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-normal);
+}
+
+.orbit-poweredby {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.orbit-empty-mark {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  opacity: 0.9;
+}
+
+/* Settings tab credit */
+.orbit-about {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.orbit-about-line {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.orbit-about-line.is-faint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* ---------- Tabs: segmented control ---------- */
+
+.orbit-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 8px 12px 4px 12px;
+  padding: 3px;
+  background: var(--background-modifier-hover);
+  border-radius: var(--orbit-radius-sm);
+}
+
+.orbit-tabs button.orbit-tab {
+  flex: 1 1 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.orbit-tabs button.orbit-tab:hover {
+  color: var(--text-normal);
+}
+
+.orbit-tabs button.orbit-tab.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- Panes ---------- */
+
+.orbit-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 10px 12px;
+}
+
+.orbit-pane.is-hidden {
+  display: none;
+}
+
+.orbit-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---------- Header: status pill + ghost action ---------- */
+
+.orbit-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 8px 0;
+}
+
+.orbit-mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The badge is the flexible part — it truncates before the actions wrap. */
+.orbit-mode-badge span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orbit-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.orbit-dot.is-safe { background: var(--color-green, #3fb950); }
+.orbit-dot.is-warn { background: var(--color-yellow, #d29922); }
+
+.orbit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* Ghost dropdown: reads as text until hovered, like the other header actions. */
+.orbit-chat-header select.orbit-model {
+  height: 22px;
+  padding: 0 20px 0 6px;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  background-position: right 4px center;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.orbit-chat-header select.orbit-model:hover,
+.orbit-chat-header select.orbit-model:focus {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  box-shadow: none;
+  outline: none;
+}
+
+.orbit-chat-header button.orbit-newchat {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.orbit-chat-header button.orbit-newchat:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ---------- Messages ---------- */
+
+.orbit-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--orbit-gap);
+  padding: 4px 0 12px 0;
+}
+
+.orbit-bubble {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+/* Your message: a quiet bubble, not a saturated block. */
+.orbit-user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 8px 12px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-radius: var(--orbit-radius) var(--orbit-radius) 4px var(--orbit-radius);
+}
+
+/* Replies are full-width plain text — far more readable than a bubble
+   in a ~350px sidebar, and it's what Claude's own UI does. */
+.orbit-assistant {
+  align-self: stretch;
+  max-width: 100%;
+  background: none;
+  color: var(--text-normal);
+  padding: 0 2px;
+}
+
+.orbit-thinking {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 2px;
+  animation: orbit-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes orbit-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.orbit-systemline {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+
+.orbit-context {
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 0 2px;
+  align-self: flex-start;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.orbit-context.is-empty {
+  display: none;
+}
+
+.orbit-output {
+  align-self: stretch;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--background-secondary);
+  border: none;
+  border-radius: var(--orbit-radius-sm);
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------- Empty state ---------- */
+
+.orbit-empty {
+  margin: auto 0;
+  padding: 16px 4px;
+  text-align: center;
+}
+
+.orbit-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+}
+
+.orbit-empty-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.orbit-example {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  margin: 6px 0;
+  background: var(--background-secondary);
+  border-radius: var(--orbit-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.orbit-example:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ---------- Composer: one bordered container, bare textarea inside ---------- */
+
+.orbit-composer {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--orbit-radius);
+  background: var(--background-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.orbit-composer:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus, transparent);
+}
+
+.orbit-composer textarea.orbit-input {
+  width: 100%;
+  resize: none;
+  min-height: 24px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 10px 12px 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: none;
+}
+
+.orbit-composer textarea.orbit-input:hover,
+.orbit-composer textarea.orbit-input:focus,
+.orbit-composer textarea.orbit-input:active {
+  border: none;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.orbit-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 6px 12px;
+}
+
+.orbit-hint {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.orbit-composer button.orbit-send {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.orbit-composer button.orbit-send:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+.orbit-composer button.orbit-send:disabled {
+  background: var(--background-modifier-border);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.orbit-composer button.orbit-send.is-running {
+  background: var(--text-error);
+  color: var(--text-on-accent);
+  font-size: 9px;
+}
+
+/* ---------- Approval cards ---------- */
+
+.orbit-approval {
+  align-self: stretch;
+  border: none;
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: var(--orbit-radius-sm);
+  padding: 10px 12px;
+  background: var(--background-secondary);
+}
+
+.orbit-approval.is-approved {
+  border-left-color: var(--color-green, #3fb950);
+  opacity: 0.75;
+}
+
+.orbit-approval.is-denied {
+  border-left-color: var(--text-error);
+  opacity: 0.65;
+}
+
+.orbit-approval-plan {
+  border-left-color: var(--text-accent, var(--interactive-accent));
+}
+
+.orbit-approval-title {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.orbit-approval-body {
+  margin: 0 0 10px 0;
+  padding: 8px 10px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--background-primary);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.orbit-approval-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.orbit-approval-actions button {
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 4px 12px;
+  box-shadow: none;
+}
+
+.orbit-approval-status {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------- Errors & banners ---------- */
+
+/* Never colour text with --text-error on --background-modifier-error: in the
+   light theme both are red, which makes the message invisible. */
+.orbit-error {
+  align-self: stretch;
+  background: var(--background-secondary);
+  border-left: 3px solid var(--text-error);
+  border-radius: var(--orbit-radius-sm);
+  color: var(--text-normal);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.orbit-error-title {
+  font-weight: 600;
+  color: var(--text-error);
+  margin-bottom: 4px;
+}
+
+.orbit-error details {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.orbit-error summary {
+  cursor: pointer;
+}
+
+.orbit-error pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.orbit-error button.orbit-error-copy {
+  margin-top: 10px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.orbit-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 12px 0 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: var(--orbit-radius-sm);
+  background: var(--background-secondary);
+  border-left: 3px solid var(--color-yellow, #d29922);
+  color: var(--text-normal);
+}
+
+.orbit-banner button.orbit-banner-dismiss {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0 4px;
+}

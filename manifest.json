@@ -1,0 +1,9 @@
+{
+  "id": "orbit",
+  "name": "Orbit",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Claude Chat, Code, and Cowork inside Obsidian — powered by your existing Claude plan, no API key.",
+  "author": "Param Shah",
+  "isDesktopOnly": true
+}

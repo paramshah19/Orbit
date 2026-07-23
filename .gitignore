@@ -1,0 +1,31 @@
+node_modules/
+main.js
+main.js.map
+*.log
+.DS_Store
+
+# Bundled output from the spike harnesses. Also covers spike/loadtest.cjs,
+# which is deliberately unpublished: it "proved" the runtime-dynamic-import
+# approach that turns out not to work inside Obsidian at all (see README).
+spike/*.cjs
+
+# Local plugin state, not source
+data.json
+.claude/
+.obsidian/
+
+# Screenshots and scratch images. Anything intended for the README goes in
+# docs/, which stays tracked.
+*.png
+*.jpg
+!docs/*.png
+!docs/*.jpg
+
+# Private planning notes. This folder doubles as an Obsidian note directory,
+# so the sprint docs live alongside the plugin but are not part of it.
+CLAUDE.md
+ORBIT-PLAN.md
+SPRINT.md
+DAILY-CHECKLIST.md
+SUPERPROMPT.md
+FUTURE.md
