@@ -7,6 +7,7 @@ import {
 	FileSystemAdapter,
 	TFile,
 	normalizePath,
+	setIcon,
 } from "obsidian";
 import { z } from "zod";
 
@@ -531,10 +532,33 @@ class OrbitView extends ItemView {
 	}
 
 	private addBubble(container: HTMLElement, role: "user" | "assistant", text: string): HTMLElement {
-		const bubble = container.createDiv({ cls: `orbit-bubble orbit-${role}` });
-		bubble.setText(text);
+		const group = container.createDiv({ cls: `orbit-msg-group orbit-msg-group-${role}` });
+		const bubble = this.addPlainBubble(group, role, text);
+		this.addCopyButton(group, () => text);
 		container.scrollTop = container.scrollHeight;
 		return bubble;
+	}
+
+	/** Bare message bubble with no group/button wrapper — caller owns the wrapper. */
+	private addPlainBubble(container: HTMLElement, role: "user" | "assistant", text: string): HTMLElement {
+		const bubble = container.createDiv({ cls: `orbit-bubble orbit-${role}` });
+		bubble.setText(text);
+		return bubble;
+	}
+
+	/** Hover-revealed copy button appended to a `.orbit-msg-group`. */
+	private addCopyButton(group: HTMLElement, getText: () => string) {
+		const btn = group.createEl("button", { cls: "orbit-copy-btn", attr: { "aria-label": "Copy" } });
+		setIcon(btn, "copy");
+		btn.addEventListener("click", () => {
+			void navigator.clipboard.writeText(getText());
+			btn.addClass("is-copied");
+			setIcon(btn, "check");
+			setTimeout(() => {
+				btn.removeClass("is-copied");
+				setIcon(btn, "copy");
+			}, 1200);
+		});
 	}
 
 	/** Vault-relative, forward-slashed display path for a tool's absolute path. */

@@ -239,12 +239,31 @@
   word-break: break-word;
   line-height: 1.5;
   font-size: 14px;
+  cursor: text;
+}
+
+/* Wraps one message (or one whole assistant turn) plus its hover-revealed
+   copy button. Alignment/width moved here from the bubble classes below
+   since the bubble is no longer a direct flex child of .orbit-messages. */
+.orbit-msg-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.orbit-msg-group-user {
+  align-self: flex-end;
+  align-items: flex-end;
+  max-width: 85%;
+}
+
+.orbit-msg-group-assistant {
+  align-self: stretch;
+  align-items: flex-start;
+  max-width: 100%;
 }
 
 /* Your message: a quiet bubble, not a saturated block. */
 .orbit-user {
-  align-self: flex-end;
-  max-width: 85%;
   padding: 8px 12px;
   background: var(--background-modifier-hover);
   color: var(--text-normal);
@@ -254,11 +273,44 @@
 /* Replies are full-width plain text — far more readable than a bubble
    in a ~350px sidebar, and it's what Claude's own UI does. */
 .orbit-assistant {
-  align-self: stretch;
-  max-width: 100%;
   background: none;
   color: var(--text-normal);
   padding: 0 2px;
+}
+
+.orbit-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+
+.orbit-msg-group:hover .orbit-copy-btn {
+  opacity: 0.7;
+}
+
+.orbit-copy-btn:hover {
+  opacity: 1 !important;
+  color: var(--text-normal);
+}
+
+.orbit-copy-btn.is-copied {
+  opacity: 1 !important;
+  color: var(--text-normal);
+}
+
+.orbit-copy-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .orbit-thinking {
