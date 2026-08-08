@@ -236,6 +236,8 @@ class OrbitView extends ItemView {
 	private sessions: Record<OrbitMode, string | null> = { chat: null, code: null, cowork: null };
 	/** Cached in-process MCP server exposing the gated Vault-API write tool. */
 	private orbitServer: unknown | null = null;
+	/** The current turn's element, so approval cards created mid-turn land inside it instead of after it. Null between turns. */
+	private activeTurnHost: HTMLElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: OrbitPlugin) {
 		super(leaf);
@@ -644,7 +646,8 @@ class OrbitView extends ItemView {
 		kind: "code" | "diff",
 	): Promise<boolean> {
 		return new Promise((resolve) => {
-			const card = container.createDiv({ cls: `orbit-approval orbit-approval-${kind}` });
+			const host = this.activeTurnHost ?? container;
+			const card = host.createDiv({ cls: `orbit-approval orbit-approval-${kind}` });
 			card.createDiv({ cls: "orbit-approval-title", text: `⏸ Approve — ${title}` });
 			card.createEl("pre", { cls: "orbit-approval-body" }).setText(body);
 			const row = card.createDiv({ cls: "orbit-approval-actions" });
@@ -919,6 +922,7 @@ class OrbitView extends ItemView {
 	): Promise<string> {
 		const contextEl = container.createDiv({ cls: "orbit-context is-empty" });
 		const turnEl = container.createDiv({ cls: "orbit-msg-group orbit-msg-group-assistant orbit-turn" });
+		this.activeTurnHost = turnEl;
 		let curBubble: HTMLElement | null = null;
 		let curText = "";
 		let produced = false;
@@ -950,64 +954,67 @@ class OrbitView extends ItemView {
 			container.scrollTop = container.scrollHeight;
 		};
 
-		for await (const msg of sdk.query({ prompt, options })) {
-			// Stop: breaking the loop closes the iterator, which ends the SDK subprocess.
-			if (this.cancel[mode]) break;
-			if (msg.session_id) this.sessions[mode] = msg.session_id;
+		try {
+			for await (const msg of sdk.query({ prompt, options })) {
+				// Stop: breaking the loop closes the iterator, which ends the SDK subprocess.
+				if (this.cancel[mode]) break;
+				if (msg.session_id) this.sessions[mode] = msg.session_id;
 
-			if (msg.type === "stream_event" && msg.event?.type === "content_block_delta") {
-				if (msg.event.delta?.type === "text_delta" && msg.event.delta.text) {
-					appendText(msg.event.delta.text);
-				}
-			} else if (msg.type === "assistant" && msg.message?.content) {
-				for (const b of msg.message.content) {
-					if (b.type !== "tool_use") continue;
-					resetBubble(); // a tool interaction ends the current text bubble
-					const inp = b.input ?? {};
-					if (b.name === "Read" && typeof inp.file_path === "string") {
-						reads.add(this.toVaultRel(inp.file_path, vaultPath));
-					} else if (b.name === "Grep" && typeof inp.pattern === "string") {
-						searches.add(`"${inp.pattern}"`);
-					} else if (b.name === "Glob" && typeof inp.pattern === "string") {
-						searches.add(inp.pattern);
-					} else if (b.name && SHELL_TOOLS.includes(b.name) && typeof b.id === "string") {
-						bashCallIds.add(b.id);
+				if (msg.type === "stream_event" && msg.event?.type === "content_block_delta") {
+					if (msg.event.delta?.type === "text_delta" && msg.event.delta.text) {
+						appendText(msg.event.delta.text);
 					}
-					this.renderContext(contextEl, reads, searches);
-				}
-			} else if (msg.type === "user" && msg.message?.content) {
-				// Stream shell stdout/stderr into the panel as an output block.
-				for (const b of msg.message.content) {
-					if (b.type === "tool_result" && typeof b.tool_use_id === "string" && bashCallIds.has(b.tool_use_id)) {
-						const out = toolResultText(b.content).trim();
-						const shown = out || "(no output)";
-						turnEl.createEl("pre", { cls: "orbit-output" }).setText(shown);
-						turnParts.push(shown);
-						produced = true;
-						resetBubble();
-						container.scrollTop = container.scrollHeight;
+				} else if (msg.type === "assistant" && msg.message?.content) {
+					for (const b of msg.message.content) {
+						if (b.type !== "tool_use") continue;
+						resetBubble(); // a tool interaction ends the current text bubble
+						const inp = b.input ?? {};
+						if (b.name === "Read" && typeof inp.file_path === "string") {
+							reads.add(this.toVaultRel(inp.file_path, vaultPath));
+						} else if (b.name === "Grep" && typeof inp.pattern === "string") {
+							searches.add(`"${inp.pattern}"`);
+						} else if (b.name === "Glob" && typeof inp.pattern === "string") {
+							searches.add(inp.pattern);
+						} else if (b.name && SHELL_TOOLS.includes(b.name) && typeof b.id === "string") {
+							bashCallIds.add(b.id);
+						}
+						this.renderContext(contextEl, reads, searches);
 					}
+				} else if (msg.type === "user" && msg.message?.content) {
+					// Stream shell stdout/stderr into the panel as an output block.
+					for (const b of msg.message.content) {
+						if (b.type === "tool_result" && typeof b.tool_use_id === "string" && bashCallIds.has(b.tool_use_id)) {
+							const out = toolResultText(b.content).trim();
+							const shown = out || "(no output)";
+							turnEl.createEl("pre", { cls: "orbit-output" }).setText(shown);
+							turnParts.push(shown);
+							produced = true;
+							resetBubble();
+							container.scrollTop = container.scrollHeight;
+						}
+					}
+				} else if (msg.type === "result" && typeof msg.result === "string") {
+					fallbackResult = msg.result;
 				}
-			} else if (msg.type === "result" && typeof msg.result === "string") {
-				fallbackResult = msg.result;
 			}
-		}
 
-		thinkingEl.remove();
-		if (this.cancel[mode]) {
-			this.addSystemLine(container, "Stopped.");
-		} else if (!produced) {
-			const text = fallbackResult || "(no response)";
-			this.addPlainBubble(turnEl, "assistant", text);
-			turnParts.push(text);
-		} else {
-			resetBubble(); // flush whatever text bubble was still in flight
+			thinkingEl.remove();
+			resetBubble(); // flush whatever text bubble was still in flight, even if cancelled
+			if (this.cancel[mode]) {
+				this.addSystemLine(container, "Stopped.");
+			} else if (!produced) {
+				const text = fallbackResult || "(no response)";
+				this.addPlainBubble(turnEl, "assistant", text);
+				turnParts.push(text);
+			}
+			this.renderContext(contextEl, reads, searches);
+			if (turnParts.length > 0) {
+				this.addCopyButton(turnEl, () => turnParts.join("\n\n"));
+			}
+			return fallbackResult;
+		} finally {
+			this.activeTurnHost = null;
 		}
-		this.renderContext(contextEl, reads, searches);
-		if (turnParts.length > 0) {
-			this.addCopyButton(turnEl, () => turnParts.join("\n\n"));
-		}
-		return fallbackResult;
 	}
 
 	private async run(mode: OrbitMode, prompt: string, container: HTMLElement) {
