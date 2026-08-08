@@ -4,6 +4,9 @@ main.js.map
 *.log
 .DS_Store
 
+# Git worktrees used for isolated feature work
+.worktrees/
+
 # Bundled output from the spike harnesses. Also covers spike/loadtest.cjs,
 # which is deliberately unpublished: it "proved" the runtime-dynamic-import
 # approach that turns out not to work inside Obsidian at all (see README).
