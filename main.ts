@@ -918,10 +918,12 @@ class OrbitView extends ItemView {
 		vaultPath: string,
 	): Promise<string> {
 		const contextEl = container.createDiv({ cls: "orbit-context is-empty" });
+		const turnEl = container.createDiv({ cls: "orbit-msg-group orbit-msg-group-assistant orbit-turn" });
 		let curBubble: HTMLElement | null = null;
 		let curText = "";
 		let produced = false;
 		let fallbackResult = "";
+		const turnParts: string[] = [];
 		const reads = new Set<string>();
 		const searches = new Set<string>();
 		const bashCallIds = new Set<string>();
@@ -929,14 +931,17 @@ class OrbitView extends ItemView {
 		const thinkingEl = container.createDiv({ cls: "orbit-thinking", text: "Claude is thinking…" });
 		container.scrollTop = container.scrollHeight;
 
+		// Ends the current text bubble, flushing its text into turnParts so
+		// the turn's eventual copy button includes it.
 		const resetBubble = () => {
+			if (curText.trim()) turnParts.push(curText);
 			curBubble = null;
 			curText = "";
 		};
 		const appendText = (delta: string) => {
 			thinkingEl.remove();
 			if (!curBubble) {
-				curBubble = this.addBubble(container, "assistant", "");
+				curBubble = this.addPlainBubble(turnEl, "assistant", "");
 				curText = "";
 			}
 			curText += delta;
@@ -975,7 +980,9 @@ class OrbitView extends ItemView {
 				for (const b of msg.message.content) {
 					if (b.type === "tool_result" && typeof b.tool_use_id === "string" && bashCallIds.has(b.tool_use_id)) {
 						const out = toolResultText(b.content).trim();
-						container.createEl("pre", { cls: "orbit-output" }).setText(out || "(no output)");
+						const shown = out || "(no output)";
+						turnEl.createEl("pre", { cls: "orbit-output" }).setText(shown);
+						turnParts.push(shown);
 						produced = true;
 						resetBubble();
 						container.scrollTop = container.scrollHeight;
@@ -990,9 +997,16 @@ class OrbitView extends ItemView {
 		if (this.cancel[mode]) {
 			this.addSystemLine(container, "Stopped.");
 		} else if (!produced) {
-			this.addBubble(container, "assistant", fallbackResult || "(no response)");
+			const text = fallbackResult || "(no response)";
+			this.addPlainBubble(turnEl, "assistant", text);
+			turnParts.push(text);
+		} else {
+			resetBubble(); // flush whatever text bubble was still in flight
 		}
 		this.renderContext(contextEl, reads, searches);
+		if (turnParts.length > 0) {
+			this.addCopyButton(turnEl, () => turnParts.join("\n\n"));
+		}
 		return fallbackResult;
 	}
 
