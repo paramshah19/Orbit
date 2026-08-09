@@ -507,7 +507,12 @@ class OrbitView extends ItemView {
 
 		newBtn.addEventListener("click", () => {
 			this.sessions[mode] = null;
-			messagesEl.empty();
+			// Not messagesEl.empty() — that would also delete the highlight
+			// pill (a persistent child wired up once by attachHighlighting).
+			for (const child of Array.from(messagesEl.children)) {
+				if (child.hasClass("orbit-highlight-pill")) (child as HTMLElement).style.display = "none";
+				else child.remove();
+			}
 			this.renderEmptyState(mode, messagesEl, input);
 		});
 
