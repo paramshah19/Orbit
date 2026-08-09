@@ -225,6 +225,7 @@
 /* ---------- Messages ---------- */
 
 .orbit-messages {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -311,6 +312,39 @@
 .orbit-copy-btn svg {
   width: 14px;
   height: 14px;
+}
+
+.orbit-highlight-pill {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--orbit-radius);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  cursor: pointer;
+  box-shadow: var(--shadow-s, 0 1px 4px rgba(0, 0, 0, 0.2));
+}
+
+.orbit-highlight-pill:hover {
+  background: var(--background-modifier-border);
+}
+
+.orbit-highlight-pill svg {
+  width: 14px;
+  height: 14px;
+}
+
+.orbit-highlight {
+  background: var(--text-highlight-bg, rgba(255, 208, 0, 0.35));
+  color: inherit;
+  border-radius: 2px;
+  cursor: pointer;
 }
 
 .orbit-thinking {

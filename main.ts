@@ -503,6 +503,7 @@ class OrbitView extends ItemView {
 		input.addEventListener("input", autoGrow);
 
 		this.renderEmptyState(mode, messagesEl, input);
+		this.attachHighlighting(messagesEl);
 
 		newBtn.addEventListener("click", () => {
 			this.sessions[mode] = null;
@@ -560,6 +561,99 @@ class OrbitView extends ItemView {
 				btn.removeClass("is-copied");
 				setIcon(btn, "copy");
 			}, 1200);
+		});
+	}
+
+	/** Wires up select-to-highlight for one panel's message list. */
+	private attachHighlighting(messagesEl: HTMLElement) {
+		const pill = messagesEl.createEl("button", {
+			cls: "orbit-highlight-pill",
+			attr: { "aria-label": "Highlight" },
+		});
+		setIcon(pill, "highlighter");
+		pill.style.display = "none";
+
+		let activeRange: Range | null = null;
+
+		const hidePill = () => {
+			pill.style.display = "none";
+			activeRange = null;
+		};
+
+		const showPillFor = (range: Range) => {
+			const rect = range.getBoundingClientRect();
+			const parentRect = messagesEl.getBoundingClientRect();
+			pill.style.display = "flex";
+			pill.style.left = `${rect.left - parentRect.left + rect.width / 2 - 14}px`;
+			pill.style.top = `${rect.top - parentRect.top - 30 + messagesEl.scrollTop}px`;
+		};
+
+		messagesEl.addEventListener("mouseup", (evt) => {
+			// Clicking the pill itself must not re-run selection handling.
+			if (evt.target === pill || pill.contains(evt.target as Node)) return;
+
+			const selection = window.getSelection();
+			if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+				hidePill();
+				return;
+			}
+			const range = selection.getRangeAt(0);
+			if (range.collapsed) {
+				hidePill();
+				return;
+			}
+
+			const bubble = (range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+				? (range.commonAncestorContainer as Element)
+				: range.commonAncestorContainer.parentElement
+			)?.closest(".orbit-bubble");
+			if (!bubble || !messagesEl.contains(bubble)) {
+				hidePill();
+				return;
+			}
+
+			// Selection must not intersect an existing highlight (avoids
+			// surroundContents throwing on a partially-overlapping range).
+			const existingMarks = bubble.querySelectorAll(".orbit-highlight");
+			for (const mark of Array.from(existingMarks)) {
+				if (range.intersectsNode(mark)) {
+					hidePill();
+					return;
+				}
+			}
+
+			activeRange = range;
+			showPillFor(range);
+		});
+
+		messagesEl.addEventListener("scroll", hidePill);
+
+		pill.addEventListener("click", () => {
+			if (!activeRange) return;
+			const mark = document.createElement("mark");
+			mark.className = "orbit-highlight";
+			try {
+				activeRange.surroundContents(mark);
+			} catch {
+				// Range spans multiple text nodes (e.g. selection crosses a
+				// child element within the bubble) — extract and re-wrap instead.
+				const contents = activeRange.extractContents();
+				mark.appendChild(contents);
+				activeRange.insertNode(mark);
+			}
+			window.getSelection()?.removeAllRanges();
+			hidePill();
+		});
+
+		messagesEl.addEventListener("click", (evt) => {
+			const target = evt.target as HTMLElement;
+			const mark = target.closest(".orbit-highlight");
+			if (!mark || !messagesEl.contains(mark)) return;
+			const parent = mark.parentNode;
+			if (!parent) return;
+			while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+			parent.removeChild(mark);
+			parent.normalize();
 		});
 	}
 
