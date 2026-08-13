@@ -141,7 +141,9 @@
 .orbit-chat-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: 4px;
   gap: 8px;
   padding: 4px 0 8px 0;
 }
@@ -152,11 +154,16 @@
   gap: 6px;
   font-size: 11px;
   color: var(--text-muted);
-  min-width: 0;
+  /* Grows to fill spare room, but keeps enough width to read the badge text
+     before the actions (model/permission pickers, New chat) get pushed to
+     their own line instead — see .orbit-header-actions below. */
+  flex: 1 1 120px;
+  min-width: 90px;
   overflow: hidden;
 }
 
-/* The badge is the flexible part — it truncates before the actions wrap. */
+/* The badge text still truncates for the longest labels, but only after
+   using its guaranteed minimum width above. */
 .orbit-mode-badge span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -173,12 +180,16 @@
 
 .orbit-dot.is-safe { background: var(--color-green, #3fb950); }
 .orbit-dot.is-warn { background: var(--color-yellow, #d29922); }
+.orbit-dot.is-danger { background: var(--color-red, #f85149); }
 
 .orbit-header-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
+  /* Sits flush right when it shares the row with the badge, and stays
+     right-aligned if it wraps to its own line below. */
+  margin-left: auto;
 }
 
 /* Ghost dropdown: reads as text until hovered, like the other header actions. */
@@ -202,6 +213,10 @@
   color: var(--text-normal);
   box-shadow: none;
   outline: none;
+}
+
+.orbit-chat-header select.orbit-permission {
+  max-width: 90px;
 }
 
 .orbit-chat-header button.orbit-newchat {

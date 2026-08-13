@@ -15,6 +15,16 @@ export const VIEW_TYPE_ORBIT = "orbit-view";
 
 type OrbitMode = "chat" | "code" | "cowork";
 
+/**
+ * How gated tool calls (shell runs, note writes) are approved. Only Code and
+ * Cowork ever read this — Chat is permanently read-only regardless.
+ *   - auto: nothing is ever gated, everything runs immediately.
+ *   - plan: read-only, nothing mutating is even attempted.
+ *   - manual: today's behavior — every run/write shows an approval card.
+ *   - acceptEdits: note writes are auto-approved; shell runs still gated.
+ */
+type OrbitPermissionMode = "auto" | "plan" | "manual" | "acceptEdits";
+
 interface OrbitSettings {
 	/** Which tab opens first. */
 	defaultMode: OrbitMode;
@@ -23,6 +33,11 @@ interface OrbitSettings {
 	 * choice can't express them (availability depends on the Claude plan tier).
 	 */
 	models: Record<OrbitMode, string>;
+	/**
+	 * Default permission mode per pane. Chat's entry exists only for shape
+	 * symmetry with `models` — it's never read or exposed in the UI.
+	 */
+	permissionModes: Record<OrbitMode, OrbitPermissionMode>;
 	/** Vault-relative folder to scope the engine to; "" = whole vault. */
 	scopeFolder: string;
 }
@@ -38,6 +53,8 @@ const DEFAULT_SETTINGS: OrbitSettings = {
 	defaultMode: "chat",
 	// Matches the plan: cheap and fast for Q&A, strongest for code and multi-step.
 	models: { chat: "sonnet", code: "opus", cowork: "opus" },
+	// Manual matches today's exact behavior, so existing users see no change.
+	permissionModes: { chat: "manual", code: "manual", cowork: "manual" },
 	scopeFolder: "",
 };
 
@@ -163,6 +180,7 @@ export default class OrbitPlugin extends Plugin {
 		}
 		delete (this.settings as Partial<OrbitSettings> & { model?: string }).model;
 		this.settings.models = { ...DEFAULT_SETTINGS.models, ...this.settings.models };
+		this.settings.permissionModes = { ...DEFAULT_SETTINGS.permissionModes, ...this.settings.permissionModes };
 	}
 
 	async saveSettings() {
@@ -185,6 +203,14 @@ export default class OrbitPlugin extends Plugin {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_ORBIT)) {
 			const view = leaf.view;
 			if (view instanceof OrbitView) view.syncModelSelects();
+		}
+	}
+
+	/** Push a settings-tab permission-mode change into any open Orbit panels. */
+	refreshPermissionSelects() {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_ORBIT)) {
+			const view = leaf.view;
+			if (view instanceof OrbitView) view.syncPermissionSelects();
 		}
 	}
 
@@ -232,6 +258,13 @@ class OrbitView extends ItemView {
 	private sendBtns: Record<OrbitMode, HTMLButtonElement | null> = { chat: null, code: null, cowork: null };
 	private inputs: Record<OrbitMode, HTMLTextAreaElement | null> = { chat: null, code: null, cowork: null };
 	private modelSelects: Record<OrbitMode, HTMLSelectElement | null> = { chat: null, code: null, cowork: null };
+	private permissionSelects: Record<OrbitMode, HTMLSelectElement | null> = { chat: null, code: null, cowork: null };
+	/** Badge dot/text elements per mode, so a permission-mode change can refresh them without a full re-render. */
+	private badgeEls: Record<OrbitMode, { dot: HTMLElement; text: HTMLElement } | null> = {
+		chat: null,
+		code: null,
+		cowork: null,
+	};
 	/** Per-mode Agent SDK session id, kept across turns for real conversations. */
 	private sessions: Record<OrbitMode, string | null> = { chat: null, code: null, cowork: null };
 	/** Cached in-process MCP server exposing the gated Vault-API write tool. */
@@ -368,12 +401,27 @@ class OrbitView extends ItemView {
 		}
 	}
 
-	/** Status pill copy + dot tone for a mode (no emoji — the dot carries the colour). */
+	/**
+	 * Status pill copy + dot tone for a mode (no emoji — the dot carries the
+	 * colour). Kept short: the header also carries the model picker and New
+	 * chat. For Code/Cowork this reflects the pane's live permission mode.
+	 */
 	private modeBadge(mode: OrbitMode): { tone: string; text: string } {
-		// Kept short: the header also carries the model picker and New chat.
 		if (mode === "chat") return { tone: "safe", text: "Read-only" };
-		if (mode === "code") return { tone: "warn", text: "Approval required" };
-		return { tone: "safe", text: "Plan first" };
+		const perm = this.plugin.settings.permissionModes[mode];
+		if (perm === "auto") return { tone: "danger", text: "Full autonomy — no approvals" };
+		if (perm === "plan") return { tone: "safe", text: "Plan only — read-only" };
+		if (perm === "acceptEdits") return { tone: "warn", text: "Edits auto-approved" };
+		return mode === "code" ? { tone: "warn", text: "Approval required" } : { tone: "safe", text: "Plan first" };
+	}
+
+	/** Re-paint one pane's badge after its permission mode changes. */
+	private refreshBadge(mode: OrbitMode) {
+		const els = this.badgeEls[mode];
+		if (!els) return;
+		const badge = this.modeBadge(mode);
+		els.dot.className = `orbit-dot is-${badge.tone}`;
+		els.text.setText(badge.text);
 	}
 
 	private modePlaceholder(mode: OrbitMode): string {
@@ -452,9 +500,53 @@ class OrbitView extends ItemView {
 		}
 	}
 
+	private readonly PERMISSION_LABELS: Record<OrbitPermissionMode, string> = {
+		auto: "Auto",
+		plan: "Plan",
+		manual: "Manual",
+		acceptEdits: "Accept edits",
+	};
+
+	/**
+	 * Per-mode permission picker (Code/Cowork only — Chat is always read-only
+	 * and never gets this control). Takes effect on the next turn.
+	 */
+	private renderPermissionSelect(parent: HTMLElement, mode: OrbitMode) {
+		const select = parent.createEl("select", { cls: "orbit-model orbit-permission" });
+		select.setAttr("aria-label", `Permission mode for ${this.modeTitle(mode)}`);
+		for (const [value, label] of Object.entries(this.PERMISSION_LABELS)) {
+			const opt = select.createEl("option", { text: label });
+			opt.value = value;
+		}
+		select.value = this.plugin.settings.permissionModes[mode];
+		select.addEventListener("change", async () => {
+			this.plugin.settings.permissionModes[mode] = select.value as OrbitPermissionMode;
+			await this.plugin.saveSettings();
+			this.syncPermissionSelects();
+			this.refreshBadge(mode);
+		});
+		this.permissionSelects[mode] = select;
+	}
+
+	/** Keep panel pickers and the settings tab from drifting apart. */
+	syncPermissionSelects() {
+		for (const m of Object.keys(this.permissionSelects) as OrbitMode[]) {
+			const el = this.permissionSelects[m];
+			if (el) el.value = this.plugin.settings.permissionModes[m];
+			this.refreshBadge(m);
+		}
+	}
+
 	/** Flip a mode's send button between Send (↑) and Stop (■). */
 	private setRunning(mode: OrbitMode, running: boolean) {
 		this.busy[mode] = running;
+		// Switching model or permission mode mid-turn wouldn't affect the
+		// in-flight turn (its options are already captured) — lock them while
+		// busy so that isn't confusing.
+		const modelSelect = this.modelSelects[mode];
+		if (modelSelect) modelSelect.disabled = running;
+		const permSelect = this.permissionSelects[mode];
+		if (permSelect) permSelect.disabled = running;
 		const btn = this.sendBtns[mode];
 		if (!btn) return;
 		btn.setText(running ? "■" : "↑");
@@ -470,10 +562,12 @@ class OrbitView extends ItemView {
 		const header = wrap.createDiv({ cls: "orbit-chat-header" });
 		const badge = this.modeBadge(mode);
 		const badgeEl = header.createDiv({ cls: "orbit-mode-badge" });
-		badgeEl.createSpan({ cls: `orbit-dot is-${badge.tone}` });
-		badgeEl.createSpan({ text: badge.text });
+		const dotEl = badgeEl.createSpan({ cls: `orbit-dot is-${badge.tone}` });
+		const textEl = badgeEl.createSpan({ text: badge.text });
+		this.badgeEls[mode] = { dot: dotEl, text: textEl };
 		const actions = header.createDiv({ cls: "orbit-header-actions" });
 		this.renderModelSelect(actions, mode);
+		if (mode !== "chat") this.renderPermissionSelect(actions, mode);
 		const newBtn = actions.createEl("button", { cls: "orbit-newchat", text: "New chat" });
 		newBtn.setAttr("aria-label", "Start a new conversation");
 
@@ -765,8 +859,12 @@ class OrbitView extends ItemView {
 		});
 	}
 
-	/** The approval gate: reads auto-allow; code runs & note writes are gated; else denied. */
-	private makeGate(container: HTMLElement) {
+	/**
+	 * The approval gate: reads auto-allow; code runs are always gated; note
+	 * writes are gated too unless the pane is in "accept edits" mode, in which
+	 * case they're silently auto-approved.
+	 */
+	private makeGate(container: HTMLElement, permMode: "manual" | "acceptEdits") {
 		return async (toolName: string, input: Record<string, unknown>) => {
 			if (READ_TOOLS.includes(toolName)) return { behavior: "allow", updatedInput: input };
 			if (SHELL_TOOLS.includes(toolName)) {
@@ -777,6 +875,7 @@ class OrbitView extends ItemView {
 					: { behavior: "deny", message: "User denied running this command." };
 			}
 			if (toolName === ORBIT_WRITE_TOOL) {
+				if (permMode === "acceptEdits") return { behavior: "allow", updatedInput: input };
 				const path = String(input.path ?? "");
 				const body = await this.buildWriteDiff(path, String(input.content ?? ""));
 				const ok = await this.renderApprovalCard(container, `Write ${path}`, body, "diff");
@@ -870,11 +969,23 @@ class OrbitView extends ItemView {
 		// Name the binary outright. Bundled into main.js, the SDK's own lookup
 		// walks from the bundle's location and can't find its sibling package.
 		const executable = claudeBinaryPath(pluginDir(this.plugin));
+		// Chat never reads its permission-mode entry — it's forced read-only
+		// regardless, entirely by buildOptions()'s own chat branch below.
+		const permMode: OrbitPermissionMode = mode === "chat" ? "manual" : this.plugin.settings.permissionModes[mode];
+		// Only "auto" changes the SDK-level permission mode. manual/acceptEdits/
+		// plan all stay "default" at the SDK level — Orbit's own tools/canUseTool
+		// gating (in buildOptions/makeGate below) is what actually enforces their
+		// distinct behavior, not the SDK's native acceptEdits/plan machinery
+		// (unused here — SDK "plan" mode expects an ExitPlanMode tool call this
+		// codebase doesn't implement).
+		const sdkPermissionMode = permMode === "auto" ? "bypassPermissions" : "default";
 		return {
 			model: this.plugin.settings.models[mode] || "sonnet",
 			cwd: this.scopedCwd(vaultPath),
 			...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
-			permissionMode: "default",
+			permissionMode: sdkPermissionMode,
+			// Required by the SDK alongside "bypassPermissions", or it refuses it.
+			...(sdkPermissionMode === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
 			settingSources: [],
 			includePartialMessages: true,
 			...(resume ? { resume } : {}),
@@ -902,7 +1013,34 @@ class OrbitView extends ItemView {
 						: { behavior: "deny", message: `Orbit Chat is read-only; ${toolName} is blocked.` },
 			};
 		}
-		// Code + Cowork execution: gated shell runs + gated Vault-API write; built-in writes removed.
+		const permMode = this.plugin.settings.permissionModes[mode];
+
+		if (permMode === "plan") {
+			// A standalone read-only posture — deliberately NOT Cowork's own
+			// plan→approve→execute machinery (see runCowork below), just a
+			// straight single-phase turn with nothing mutating available.
+			return {
+				...base,
+				maxTurns: 12,
+				tools: CHAT_TOOLS,
+				allowedTools: CHAT_TOOLS,
+				disallowedTools: CHAT_BLOCKED_TOOLS,
+				systemPrompt: this.systemPrompt(
+					mode,
+					vaultPath,
+					[
+						"## Right now: Plan mode",
+						"This pane is set to Plan mode: read-only. You have Read, Grep and Glob only — no writes, no shell commands. Explore and describe what you would do; do not claim you performed an action.",
+					].join("\n"),
+				),
+				canUseTool: async (toolName: string, input: Record<string, unknown>) =>
+					READ_TOOLS.includes(toolName)
+						? { behavior: "allow", updatedInput: input }
+						: { behavior: "deny", message: `Orbit is in Plan mode (read-only); ${toolName} is blocked.` },
+			};
+		}
+
+		// auto / manual / acceptEdits: gated (or auto-allowed) shell runs + Vault-API write; built-in writes removed.
 		return {
 			...base,
 			maxTurns: 24,
@@ -910,7 +1048,9 @@ class OrbitView extends ItemView {
 			tools: CODE_TOOLS,
 			disallowedTools: WRITE_BLOCKED,
 			mcpServers: { orbit: this.buildOrbitServer(sdk) },
-			canUseTool: this.makeGate(container),
+			// "auto" omits canUseTool entirely — bypassPermissions (set in
+			// baseOptions) already skips all permission checks at the SDK level.
+			...(permMode === "auto" ? {} : { canUseTool: this.makeGate(container, permMode) }),
 		};
 	}
 
@@ -1153,6 +1293,32 @@ class OrbitView extends ItemView {
 			return;
 		}
 
+		// Pane explicitly set to Plan mode: skip Cowork's own plan→approve→
+		// execute machinery entirely and run a single read-only turn, same as
+		// Code's plan branch in buildOptions().
+		if (this.plugin.settings.permissionModes.cowork === "plan") {
+			this.cancel.cowork = false;
+			this.setRunning("cowork", true);
+			try {
+				const activeFile = this.app.workspace.getActiveFile();
+				const fullPrompt = activeFile ? `(The user's currently active note is: ${activeFile.path})\n\n${prompt}` : prompt;
+				await this.streamTurn(
+					"cowork",
+					fullPrompt,
+					this.buildOptions("cowork", vaultPath, container, sdk),
+					container,
+					vaultPath,
+				);
+			} catch (err) {
+				this.renderError(container, err);
+			} finally {
+				this.setRunning("cowork", false);
+				this.cancel.cowork = false;
+				container.scrollTop = container.scrollHeight;
+			}
+			return;
+		}
+
 		this.cancel.cowork = false;
 		this.setRunning("cowork", true);
 		try {
@@ -1243,6 +1409,31 @@ class OrbitSettingTab extends PluginSettingTab {
 							// Panel pickers are rebuilt from settings when the view reopens;
 							// refresh any that are live right now.
 							this.plugin.refreshModelSelects();
+						}),
+				);
+		}
+
+		containerEl.createEl("h4", { text: "Default permission mode" });
+		containerEl.createEl("p", {
+			text: "Auto runs everything without asking. Manual (default) asks before every code run and note write — today's behavior. Accept edits auto-approves note writes but still asks before running code. Plan is read-only — no writes or runs at all. Also switchable per-pane.",
+			cls: "setting-item-description",
+		});
+		const permissionDescs: Record<"code" | "cowork", string> = {
+			code: "Applies to the Code tab.",
+			cowork: "Applies to the Cowork tab.",
+		};
+		for (const mode of ["code", "cowork"] as const) {
+			new Setting(containerEl)
+				.setName(mode.charAt(0).toUpperCase() + mode.slice(1))
+				.setDesc(permissionDescs[mode])
+				.addDropdown((d) =>
+					d
+						.addOptions({ auto: "Auto", plan: "Plan", manual: "Manual", acceptEdits: "Accept edits" })
+						.setValue(this.plugin.settings.permissionModes[mode])
+						.onChange(async (v) => {
+							this.plugin.settings.permissionModes[mode] = v as OrbitPermissionMode;
+							await this.plugin.saveSettings();
+							this.plugin.refreshPermissionSelects();
 						}),
 				);
 		}
