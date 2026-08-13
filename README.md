@@ -10,7 +10,7 @@ Orbit embeds the [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk) (
 
 - **Obsidian desktop.** Orbit is `isDesktopOnly` — it needs Node/Electron, so it can't run on mobile.
 - **[Claude Code](https://code.claude.com) installed and logged in.** Verified against CLI v2.1.214 and SDK v0.3.214.
-- A Claude plan. Model availability follows your tier — Opus generally needs Max; without it, use Sonnet 5 or Haiku 4.5.
+- A Claude plan. Model availability follows your tier — Opus generally needs Pro; without it, use Sonnet 5 or Haiku 4.5.
 
 ## The three modes
 
